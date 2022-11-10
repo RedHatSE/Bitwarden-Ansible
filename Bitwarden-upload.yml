@@ -1,0 +1,44 @@
+---
+    - name: loging using BW
+      hosts: localhost
+      gather_facts: false
+      vars: 
+        env:
+          BW_CLIENTID: 
+          BW_CLIENTSECRET: 
+          BW_MASTER_PWD: 
+          BW_NAME: 
+          BW_CONTENT:
+    
+      tasks:
+    
+        - name: check to see if user is logged in
+          shell: bw status
+          register: VERIFY_LOGIN
+          environment: "{{env}}"
+    
+        - name: login w/ignore_errors incase you are logged in
+          shell: bw login --apikey 
+          ignore_errors: yes
+          when: VERIFY_LOGIN.stdout | regex_search('unauthenticated')
+          environment: "{{env}}"
+    
+        - name: Login to Bitwarden
+          shell: "bw unlock {{ env.BW_MASTER_PWD }} --raw"
+          register: BW_SESSION_KEY
+          environment: "{{env}}"
+    
+        - name: Sync Bitwarden 
+          command: "bw sync --session {{ BW_SESSION_KEY }}"  
+          environment: "{{env}}"
+    
+        - name: look at output
+          debug:
+           msg: "{{ BW_SESSION_KEY.stdout }}"
+    
+        - name: upload Secure Stored Data
+          shell: bw --session "{{BW_SESSION_KEY.stdout}}" get template item | jq '.type = 2 | .secureNote.type = 0 | .notes = "{{lookup('file', '{{content}}')}}" | .name = "{{env.BW_NAME}}"' | bw encode  | bw --session "{{BW_SESSION_KEY.stdout}}" create item 
+    
+      
+      
+     
